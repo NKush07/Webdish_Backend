@@ -1,0 +1,6 @@
+/venv
+/idea
+/api/credentials.json
+/api/Food_Recipes_and_Reviews.csv
+/api/recipe_data_with_images.csv
+.env
