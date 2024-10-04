@@ -73,7 +73,7 @@ def index():
         return jsonify({'message': f'Something went wrong: {str(e)}'}), 400
 
 
-@app.route("login/google/authorized")
+@app.route("/login/google/authorized")
 def google_callback():
     try:
         if not google.authorized:
