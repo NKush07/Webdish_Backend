@@ -522,20 +522,20 @@ def get_steps(id):
 
 
 # Firebase setup
-firebase_storage_bucket = 'gs://ai-chef-master-37900.appspot.com'
+# firebase_storage_bucket = 'gs://ai-chef-master-37900.appspot.com'
 
 # Initialize Google Cloud Storage client
 # storage_client = storage.Client()
 # bucket = storage_client.bucket(firebase_storage_bucket)
 
-cred = credentials.Certificate('credentials.json')
-firebase_admin.initialize_app(cred, {
-    'storageBucket': 'ai-chef-master-37900.appspot.com'
-})
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials.json"
-storage_client = storage.Client()
-bucket_name = "ai-chef-master-37900.appspot.com"
-bucket = storage_client.bucket(bucket_name)
+# cred = credentials.Certificate('credentials.json')
+# firebase_admin.initialize_app(cred, {
+#     'storageBucket': 'ai-chef-master-37900.appspot.com'
+# })
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials.json"
+# storage_client = storage.Client()
+# bucket_name = "ai-chef-master-37900.appspot.com"
+# bucket = storage_client.bucket(bucket_name)
 
 
 @app.route('/upload', methods=['POST'])
