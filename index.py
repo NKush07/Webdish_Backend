@@ -538,44 +538,44 @@ def get_steps(id):
 # bucket = storage_client.bucket(bucket_name)
 
 
-@app.route('/upload', methods=['POST'])
-def upload_video():
-    try:
-        # Get dish ID and step index from the form data
-        dish_id = request.form.get('dishId')
-        step_index = int(request.form.get('stepIndex'))
-        print(dish_id, step_index)
-        print(request.files['video'])
+# @app.route('/upload', methods=['POST'])
+# def upload_video():
+#     try:
+#         # Get dish ID and step index from the form data
+#         dish_id = request.form.get('dishId')
+#         step_index = int(request.form.get('stepIndex'))
+#         print(dish_id, step_index)
+#         print(request.files['video'])
 
-        # Get the uploaded file from the request
-        if 'video' not in request.files:
-            return jsonify({'error': 'No video file part in the request'}), 400
+#         # Get the uploaded file from the request
+#         if 'video' not in request.files:
+#             return jsonify({'error': 'No video file part in the request'}), 400
 
-        file = request.files['video']
+#         file = request.files['video']
 
-        if file.filename == '':
-            return jsonify({'error': 'No selected file'}), 400
+#         if file.filename == '':
+#             return jsonify({'error': 'No selected file'}), 400
 
-        if file:
-            filename = secure_filename(file.filename)
-            dish_name = db.receipe.find_one({'id': dish_id})['name']
-            folder_path = f"{dish_name}/"
+#         if file:
+#             filename = secure_filename(file.filename)
+#             dish_name = db.receipe.find_one({'id': dish_id})['name']
+#             folder_path = f"{dish_name}/"
 
-            # Upload file to Firebase Storage
-            blob = bucket.blob(f"{folder_path}{filename}")
-            blob.upload_from_file(file)
-            blob.make_public()
-            video_url = blob.public_url
+#             # Upload file to Firebase Storage
+#             blob = bucket.blob(f"{folder_path}{filename}")
+#             blob.upload_from_file(file)
+#             blob.make_public()
+#             video_url = blob.public_url
 
-            # Update the MongoDB document with the new video URL
-            db.receipe.update_one(
-                {'id': dish_id},
-                {'$set': {f'recipeSteps.{step_index}.videoSource': video_url}}
-            )
+#             # Update the MongoDB document with the new video URL
+#             db.receipe.update_one(
+#                 {'id': dish_id},
+#                 {'$set': {f'recipeSteps.{step_index}.videoSource': video_url}}
+#             )
 
-            return jsonify({'message': 'Video uploaded successfully', 'video_url': video_url})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+#             return jsonify({'message': 'Video uploaded successfully', 'video_url': video_url})
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
