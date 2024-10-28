@@ -33,7 +33,7 @@ scheduler.init_app(app)
 scheduler.start()
 
 client = MongoClient(os.getenv('MONGODB_URL'))
-db = client['AI_Chef_Master']
+db = client['AI_Chef_Master']  
 dishes = db['dishes']
 
 # google login
@@ -49,16 +49,18 @@ google_blueprint = make_google_blueprint(
 app.register_blueprint(google_blueprint, url_prefix="/login")
 
 
-# #firebase credential
+# Firebase setup
+firebase_storage_bucket = 'ai-chef-master-37900.appspot.com'
+cred = credentials.Certificate('credentials.json')
+firebase_admin.initialize_app(cred, {
+    'storageBucket': firebase_storage_bucket
+})
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials.json"
+# Initialize Google Cloud Storage client
+storage_client = storage.Client()
+bucket = storage_client.bucket(firebase_storage_bucket) 
 
-# cred = credentials.Certificate("credentials.json")
-# firebase_admin.initialize_app(cred)
-
-# #os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials.json"
-# storage_client = storage.Client()
-# bucket_name = "gs://ai-chef-master-37900.appspot.com"
-# bucket = storage_client.bucket(bucket_name)
-
+#=======================================================================================================================================================
 
 @app.route("/")
 def index():
@@ -453,7 +455,7 @@ def get_dish_by_name():
         return jsonify(dish)
     else:
         return jsonify({"error": "Dish not found"}), 404
-
+    
 @app.route('/dishes/<id>/ingredients', methods=['GET'])
 def get_ingredients(id):
     dish = db.Dish.find_one({'id': id})
@@ -491,6 +493,7 @@ def get_recipe(id):
         return jsonify({"error": "Recipe not found"}), 404
 
 
+
 @app.route('/dishes/state', methods=['POST'])
 def get_states():
     data = request.json
@@ -521,61 +524,44 @@ def get_steps(id):
         return jsonify({"error": "Recipe not found"}), 404
 
 
-# Firebase setup
-# firebase_storage_bucket = 'gs://ai-chef-master-37900.appspot.com'
+@app.route('/upload', methods=['POST'])
+def upload_video():
+    try:
+        # Get dish ID and step index from the form data
+        dish_id = request.form.get('dishId')
+        step_index = int(request.form.get('stepIndex'))
+        print(dish_id, step_index)
+        print(request.files['video'])
 
-# Initialize Google Cloud Storage client
-# storage_client = storage.Client()
-# bucket = storage_client.bucket(firebase_storage_bucket)
+        # Get the uploaded file from the request
+        if 'video' not in request.files:
+            return jsonify({'error': 'No video file part in the request'}), 400
 
-# cred = credentials.Certificate('credentials.json')
-# firebase_admin.initialize_app(cred, {
-#     'storageBucket': 'ai-chef-master-37900.appspot.com'
-# })
-# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials.json"
-# storage_client = storage.Client()
-# bucket_name = "ai-chef-master-37900.appspot.com"
-# bucket = storage_client.bucket(bucket_name)
+        file = request.files['video']
 
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
 
-# @app.route('/upload', methods=['POST'])
-# def upload_video():
-#     try:
-#         # Get dish ID and step index from the form data
-#         dish_id = request.form.get('dishId')
-#         step_index = int(request.form.get('stepIndex'))
-#         print(dish_id, step_index)
-#         print(request.files['video'])
+        if file:
+            filename = secure_filename(file.filename)
+            dish_name = db.receipe.find_one({'id': dish_id})['name']
+            folder_path = f"{dish_name}/"
 
-#         # Get the uploaded file from the request
-#         if 'video' not in request.files:
-#             return jsonify({'error': 'No video file part in the request'}), 400
+            # Upload file to Firebase Storage
+            blob = bucket.blob(f"{folder_path}{filename}")
+            blob.upload_from_file(file)
+            blob.make_public()
+            video_url = blob.public_url
 
-#         file = request.files['video']
+            # Update the MongoDB document with the new video URL
+            db.receipe.update_one(
+                {'id': dish_id},
+                {'$set': {f'recipeSteps.{step_index}.videoSource': video_url}}
+            )
 
-#         if file.filename == '':
-#             return jsonify({'error': 'No selected file'}), 400
-
-#         if file:
-#             filename = secure_filename(file.filename)
-#             dish_name = db.receipe.find_one({'id': dish_id})['name']
-#             folder_path = f"{dish_name}/"
-
-#             # Upload file to Firebase Storage
-#             blob = bucket.blob(f"{folder_path}{filename}")
-#             blob.upload_from_file(file)
-#             blob.make_public()
-#             video_url = blob.public_url
-
-#             # Update the MongoDB document with the new video URL
-#             db.receipe.update_one(
-#                 {'id': dish_id},
-#                 {'$set': {f'recipeSteps.{step_index}.videoSource': video_url}}
-#             )
-
-#             return jsonify({'message': 'Video uploaded successfully', 'video_url': video_url})
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+            return jsonify({'message': 'Video uploaded successfully', 'video_url': video_url})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
