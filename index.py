@@ -12,8 +12,8 @@ from flask_jwt_extended import create_access_token, jwt_required, JWTManager, ge
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import firebase_admin
-from firebase_admin import credentials, storage
+# import firebase_admin
+# from firebase_admin import credentials, storage
 from google.cloud import storage
 
 from dotenv import load_dotenv
@@ -51,14 +51,14 @@ app.register_blueprint(google_blueprint, url_prefix="/login")
 
 # Firebase setup
 firebase_storage_bucket = 'ai-chef-master-eeb7d.appspot.com'
-cred = credentials.Certificate('credentials.json')
-firebase_admin.initialize_app(cred, {
-    'storageBucket': firebase_storage_bucket
-})
+# cred = credentials.Certificate('credentials.json')
+# firebase_admin.initialize_app(cred, {
+#     'storageBucket': firebase_storage_bucket
+# })
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials.json"
 # Initialize Google Cloud Storage client
-storage_client = storage.Client()
-bucket = storage_client.bucket(firebase_storage_bucket) 
+# storage_client = storage.Client()
+# bucket = storage_client.bucket(firebase_storage_bucket) 
 
 #=======================================================================================================================================================
 
@@ -240,10 +240,10 @@ def history(name):
 @app.route("/retrieve-history", methods=['POST'])
 def retrieve_history():
     history = [i['title'] for i in db.recent.find({'user':request.json.get('chef')})]
-    print(history)
+    # print(history)
     dish_info = []
     for i in history:
-        print(db.Dish.find_one({"dish_name":i}))
+        # print(db.Dish.find_one({"dish_name":i}))
         dish_info.append(db.Dish.find_one({'dish_name': i}))
     return json.loads(json_util.dumps(dish_info))
 
@@ -531,15 +531,60 @@ def get_states():
     return jsonify(dishes)
 
 
-@app.route('/feedback', methods=['POST'])
-def feedback():
-    data = request.json
-    db.Feedback.insert_one({
-        "email": data.get('email'),
-        "message": data.get('message'),
-        "reaction": data.get('reaction')
-    })
-    return jsonify({'message': 'Message added successfully'}), 201
+def validate_feedback_data(data):
+    """Validate the feedback form data"""
+    required_fields = ['email', 'overallRating', 'message']
+    
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return False, f"Missing required field: {field}"
+            
+    if not isinstance(data['overallRating'], (int, float)) or not (0 <= data['overallRating'] <= 5):
+        return False, "Invalid overall rating"
+        
+    return True, None
+
+
+@app.route('/dish-feedback', methods=['POST'])
+def submit_feedback():
+    try:
+        data = request.json
+        
+        # Validate the incoming data
+        is_valid, error_message = validate_feedback_data(data)
+        if not is_valid:
+            return jsonify({"error": error_message}), 400
+            
+        # Add timestamp to the feedback
+        feedback_document = {
+            "email": data["email"],
+            "reviewType": data.get("reviewType", ""),
+            "overallRating": data["overallRating"],
+            "difficultyLevel": data.get("difficultyLevel", ""),
+            "cookingTime": data.get("cookingTime", ""),
+            "tasteRating": data.get("tasteRating", 0),
+            "presentationRating": data.get("presentationRating", 0),
+            "followedInstructions": data.get("followedInstructions", True),
+            "madeModifications": data.get("madeModifications", False),
+            "modifications": data.get("modifications", ""),
+            "wouldMakeAgain": data.get("wouldMakeAgain", ""),
+            "message": data["message"],
+            "suggestedImprovements": data.get("suggestedImprovements", ""),
+            "photoUrl": data.get("photoUrl", ""),
+            "createdAt": datetime.utcnow()
+        }
+        
+        # Insert the feedback into MongoDB
+        result = db.Feedback.insert_one(feedback_document)
+        
+        if result.inserted_id:
+            return jsonify({"message": "Message added successfully", "id": str(result.inserted_id)}), 201
+        else:
+            return jsonify({"error": "Failed to save feedback"}), 500
+            
+    except Exception as e:
+        app.logger.error(f"Error submitting feedback: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route('/steps/<id>', methods=['GET'])
