@@ -1,4 +1,5 @@
 import json
+import re
 import os
 import urllib
 from datetime import datetime, timedelta
@@ -34,7 +35,7 @@ scheduler.start()
 
 client = MongoClient(os.getenv('MONGODB_URL'))
 db = client['AI_Chef_Master']  
-dishes = db['dishes']
+dishes = db['Actual_dish']
 
 # google login
 app.config["GOOGLE_OAUTH_CLIENT_ID"] = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
@@ -241,7 +242,11 @@ def history(name):
 def retrieve_history():
     try:
         history = db.recent.find_one({"user":request.json.get("chef")}, {"dishes":1, "_id":0})['dishes']
-        return json.loads(json_util.dumps(history)), 200
+        dishes = []
+        for j in history:
+            for i in list(db.Actual_dish.find({"dish_name":j})):
+                dishes.append(i)
+        return json.loads(json_util.dumps(dishes)), 200
     except Exception as e:
         return jsonify({"err":str(e)}), 500
 
@@ -475,13 +480,13 @@ def start_process():
 #arnab code
 @app.route('/dishes', methods=['GET'])
 def get_dishes():
-    dishes = db.Dish.find({}, {'_id': 0})
+    dishes = db.Actual_dish.find({}, {'_id': 0})
     return jsonify([dish for dish in dishes])
 
 
 @app.route('/name/<id>', methods=['GET'])
 def get_details(id):
-    details = db.Dish.find_one({'id': id}, {'_id': 0, 'dish_name': 1})
+    details = db.Actual_dish.find_one({'id': id}, {'_id': 0, 'dish_name': 1})
     return jsonify(details)
 
 @app.route('/dish', methods=['POST'])
@@ -492,7 +497,7 @@ def get_dish_by_name():
     if not dish_name:
         return jsonify({"error": "Dish name not provided"}), 400
 
-    dish = db.Dish.find_one({'dish_name': dish_name}, {'_id': 0})
+    dish = db.Actual_dish.find_one({'dish_name': dish_name}, {'_id': 0})
 
     if dish:
         return jsonify(dish)
@@ -501,7 +506,7 @@ def get_dish_by_name():
     
 @app.route('/dishes/<id>/ingredients', methods=['GET'])
 def get_ingredients(id):
-    dish = db.Dish.find_one({'id': id})
+    dish = db.Actual_dish.find_one({'id': id})
     if dish:
         id = dish.get('id')
         cuisine = dish.get('Cuisine')
@@ -610,6 +615,55 @@ def get_steps(id):
         return jsonify(dish['recipeSteps'])
     else:
         return jsonify({"error": "Recipe not found"}), 404
+
+
+def remove_emojis(text):
+    """
+    Removes emojis and special characters from a string.
+    """
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # Emoticons
+        "\U0001F300-\U0001F5FF"  # Symbols & Pictographs
+        "\U0001F680-\U0001F6FF"  # Transport & Map Symbols
+        "\U0001F1E0-\U0001F1FF"  # Flags (iOS)
+        "\U00002702-\U000027B0"  # Other Miscellaneous Symbols
+        "\U000024C2-\U0001F251"  # Enclosed Characters
+        "]+",
+        flags=re.UNICODE,
+    )
+    return emoji_pattern.sub(r"", text).strip()
+
+@app.route('/api/compare-ingredients', methods=['POST'])
+def compare_ingredients():
+    # Get user-provided ingredients and clean them
+    data = request.json
+    user_ingredients = set(
+        remove_emojis(ing).lower() for ing in data.get("ingredients", [])
+    )
+
+    matching_recipes = db.Collective_dish.find()
+
+    result = []
+    for recipe in matching_recipes:
+        recipe_ingredients = set()
+        for ing in recipe.get("ingredients", []):
+            if isinstance(ing, dict) and "name" in ing:
+                recipe_ingredients.add(remove_emojis(ing["name"]).lower())
+            elif isinstance(ing, str):
+                recipe_ingredients.add(remove_emojis(ing).lower())
+
+        if user_ingredients & recipe_ingredients:
+            result.append({
+                "dish_name": recipe.get("dish_name"),
+                "ingredients": [ing.get("name", ing) if isinstance(ing, dict) else ing for ing in recipe.get("ingredients", [])],
+                "image": recipe.get("image"),
+                "description": recipe.get("description"),
+                "popularity_state": recipe.get("popularity_state"),
+            })
+
+    return jsonify(result), 200
+
 
 
 @app.route('/upload', methods=['POST'])
