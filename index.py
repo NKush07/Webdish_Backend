@@ -241,12 +241,16 @@ def history(name):
 @app.route("/retrieve-history", methods=['POST'])
 def retrieve_history():
     try:
-        history = db.recent.find_one({"user":request.json.get("chef")}, {"dishes":1, "_id":0})['dishes']
-        dishes = []
-        for j in history:
-            for i in list(db.Actual_dish.find({"dish_name":j})):
-                dishes.append(i)
-        return json.loads(json_util.dumps(dishes)), 200
+        history = db.recent.find_one({"user":request.json.get("chef")}, {"dishes":1, "_id":0})
+        if history:
+            history = history['dishes']
+            dishes = []
+            for j in history:
+                for i in list(db.Actual_dish.find({"dish_name":j})):
+                    dishes.append(i)
+            return json.loads(json_util.dumps(dishes)), 200
+        else:
+            return json.loads(json_util.dumps([])), 200
     except Exception as e:
         return jsonify({"err":str(e)}), 500
 
@@ -642,7 +646,7 @@ def compare_ingredients():
         remove_emojis(ing).lower() for ing in data.get("ingredients", [])
     )
 
-    matching_recipes = db.Collective_dish.find()
+    matching_recipes = db.Actual_dish.find()
 
     result = []
     for recipe in matching_recipes:
@@ -664,6 +668,30 @@ def compare_ingredients():
 
     return jsonify(result), 200
 
+
+@app.route('/api/ingredient-suggestions', methods=['GET'])
+def ingredient_suggestions():
+    query = request.args.get('q', '').strip().lower()  # Get the query parameter
+    if not query:
+        return jsonify([])  # If the query is empty, return an empty list
+    
+    suggest_recipes = db.Actual_dish.find()
+    all_ingredients = set()
+    
+    for recipe in suggest_recipes:
+        if 'ingredients' in recipe:  # Check if the recipe contains ingredients
+            for ingredient in recipe['ingredients']:
+                if isinstance(ingredient, dict) and 'name' in ingredient:
+                    ingredient_name = remove_emojis(ingredient['name']).lower()
+                elif isinstance(ingredient, str):
+                    ingredient_name = remove_emojis(ingredient).lower()
+                else:
+                    continue
+                
+                all_ingredients.add(ingredient_name)
+
+    suggestions = [ingredient for ingredient in all_ingredients if ingredient.startswith(query)]
+    return jsonify(suggestions), 200
 
 
 @app.route('/upload', methods=['POST'])
