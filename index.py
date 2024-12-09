@@ -290,7 +290,6 @@ from models import recommend_dishes, recommend_recipes_by_review
 
 @app.route('/query_recommend', methods=['POST'])
 def query_recommend():
-    
     try:
         query = request.json.get('query')
         if not query:
@@ -308,7 +307,7 @@ def recommend():
     query = request.json.get("query")
     if not query:
         return jsonify({"error":"Query not provided"})
-    return json_util.dumps(list(db.Dish.find({'dish_name': {"$regex":query}})))
+    return json_util.dumps(list(db.dishes.find({'dish_name': {"$regex":query}})))
     
 # API Route for recipe recommendation by feedback
 
@@ -550,7 +549,7 @@ def get_recipe(id):
 def get_states():
     data = request.json
     state = data.get('state')
-    cursor = db['Dish'].find({"popularity_state": state}, {"_id": 0})
+    cursor = db['Actual_dish'].find({"popularity_state": state}, {"_id": 0})
     # Convert cursor to a list of dictionaries
     dishes = list(cursor)
     return jsonify(dishes)
