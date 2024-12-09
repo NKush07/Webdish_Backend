@@ -693,6 +693,33 @@ def ingredient_suggestions():
     suggestions = [ingredient for ingredient in all_ingredients if ingredient.startswith(query)]
     return jsonify(suggestions), 200
 
+@app.route('/api/check-ingredient', methods=['POST'])
+def check_ingredient():
+    data = request.json
+    ingredient = data.get("ingredient", "").strip().lower()  # Get the ingredient from the request
+    if not ingredient:
+        return jsonify({"exists": False}), 400  # Bad request if no ingredient is provided
+
+    # Query the database to check if the ingredient exists
+    suggest_recipes = db.Actual_dish.find()
+    all_ingredients = set()
+
+    for recipe in suggest_recipes:
+        if 'ingredients' in recipe:  # Check if the recipe contains ingredients
+            for item in recipe['ingredients']:
+                if isinstance(item, dict) and 'name' in item:
+                    ingredient_name = remove_emojis(item['name']).lower()
+                elif isinstance(item, str):
+                    ingredient_name = remove_emojis(item).lower()
+                else:
+                    continue
+
+                all_ingredients.add(ingredient_name)
+
+    # Check if the provided ingredient exists in the set of ingredients
+    exists = ingredient in all_ingredients
+    return jsonify({"exists": exists}), 200
+
 
 @app.route('/upload', methods=['POST'])
 def upload_video():
