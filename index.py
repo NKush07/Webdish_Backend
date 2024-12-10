@@ -626,12 +626,12 @@ def remove_emojis(text):
     """
     emoji_pattern = re.compile(
         "["
-        "\U0001F600-\U0001F64F"  # Emoticons
-        "\U0001F300-\U0001F5FF"  # Symbols & Pictographs
-        "\U0001F680-\U0001F6FF"  # Transport & Map Symbols
-        "\U0001F1E0-\U0001F1FF"  # Flags (iOS)
-        "\U00002702-\U000027B0"  # Other Miscellaneous Symbols
-        "\U000024C2-\U0001F251"  # Enclosed Characters
+        "\U0001F600-\U0001F64F"  
+        "\U0001F300-\U0001F5FF"  
+        "\U0001F680-\U0001F6FF"  
+        "\U0001F1E0-\U0001F1FF"  
+        "\U00002702-\U000027B0"  
+        "\U000024C2-\U0001F251"  
         "]+",
         flags=re.UNICODE,
     )
@@ -695,16 +695,16 @@ def ingredient_suggestions():
 @app.route('/api/check-ingredient', methods=['POST'])
 def check_ingredient():
     data = request.json
-    ingredient = data.get("ingredient", "").strip().lower()  # Get the ingredient from the request
+    ingredient = data.get("ingredient", "").strip().lower()  
     if not ingredient:
-        return jsonify({"exists": False}), 400  # Bad request if no ingredient is provided
+        return jsonify({"exists": False}), 400 
 
-    # Query the database to check if the ingredient exists
+    # Query the database to check if the ingredient exist
     suggest_recipes = db.Actual_dish.find()
     all_ingredients = set()
 
     for recipe in suggest_recipes:
-        if 'ingredients' in recipe:  # Check if the recipe contains ingredients
+        if 'ingredients' in recipe:
             for item in recipe['ingredients']:
                 if isinstance(item, dict) and 'name' in item:
                     ingredient_name = remove_emojis(item['name']).lower()
@@ -715,10 +715,24 @@ def check_ingredient():
 
                 all_ingredients.add(ingredient_name)
 
-    # Check if the provided ingredient exists in the set of ingredients
     exists = ingredient in all_ingredients
     return jsonify({"exists": exists}), 200
 
+@app.route("/api/orders", methods=["POST"])
+def place_order():
+    try:
+        order_data = request.get_json()
+
+        if not order_data or "items" not in order_data:
+            return jsonify({"message": "Invalid order data"}), 400
+
+        order_data["date"] = datetime.utcnow()
+        order_id = db.orders.insert_one(order_data).inserted_id
+        return jsonify({"message": "Order placed successfully!", "order_id": str(order_id)}), 201
+
+    except Exception as e:
+        return jsonify({"message": f"Error placing order: {str(e)}"}), 500
+    
 
 @app.route('/upload', methods=['POST'])
 def upload_video():
